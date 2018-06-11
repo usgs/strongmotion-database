@@ -1,0 +1,1 @@
+# strongmotion-database
