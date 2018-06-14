@@ -1,0 +1,32 @@
+{
+  "name": "strongmotion-database",
+  "organization": "U.S. Geological Survey",
+  "description": "Prepare and facilitate database entry of strong motion timeseries and metadata",
+  "status": "Beta",
+  "homepage": "https://github.com/usgs/strongmotion-database",
+  "downloadURL": "https://github.com/usgs/strongmotion-database/archive/master.zip",
+
+  "openSourceProject": 1,
+  "license": "https://github.com/usgs/strongmotion-database/blob/master/LICENSE.md",
+  "vcs": "git",
+  "repository": "https://github.com/usgs/strongmotion-database.git",
+
+  "tags": [
+    "earthquake",
+    "database",
+    "strong motion",
+    "amplitudes",
+    "ground motion"
+  ],
+  "languages": [
+    "python"
+  ],
+
+  "contact": {
+    "name": "Mike Hearne",
+    "email": "mhearne@usgs.gov"
+  },
+  "updated": {
+    "metadataLastUpdated": "2018-06-14"
+  }
+}
