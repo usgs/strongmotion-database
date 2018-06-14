@@ -1,0 +1,23 @@
+name: strongmotion-database
+channels:
+- conda-forge
+- defaults
+dependencies:
+- amptools
+- defusedxml
+- descartes
+- docutils
+- libcomcat
+- matplotlib
+- numpy
+- obspy
+- pandas
+- ps2ff
+- psutil
+- pyproj
+- pytest
+- pytest-cov
+- python=3.5
+- python-daemon
+- scikit-image
+- scipy
