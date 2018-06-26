@@ -1,4 +1,4 @@
-name: strongmotion-database
+name: smdb
 channels:
 - conda-forge
 - defaults

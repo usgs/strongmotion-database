@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 unamestr=`uname`
@@ -20,7 +21,7 @@ source $prof
 echo "Path:"
 echo $PATH
 
-VENV=strongmotion-database
+VENV=smdb
 
 # Is the reset flag set?
 reset=0
@@ -80,7 +81,11 @@ echo ""
 
 
 # Choose an environment file based on platform
-echo ". $HOME/miniconda/etc/profile.d/conda.sh" >> $prof
+# only add this line if it does not already exist
+grep "/etc/profile.d/conda.sh" $prof
+if [ $? -ne 0 ]; then
+    echo ". $_CONDA_ROOT/etc/profile.d/conda.sh" >> $prof
+fi
 
 # If the user has specified the -r (reset) flag, then create an
 # environment based on only the named dependencies, without
@@ -118,4 +123,3 @@ pip install -e .
 #python bin/sm_profile -c default -a
 
 # Tell the user they have to activate this environment
-echo "Type 'conda activate $VENV' to use this new virtual environment."
