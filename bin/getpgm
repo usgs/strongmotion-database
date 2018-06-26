@@ -1,0 +1,93 @@
+#!/usr/bin/env python
+
+# stdlib imports
+import argparse
+import importlib
+import os.path
+import sys
+
+# local imports
+from smdb.event_summary import EventSummary
+
+# third party imports
+import pandas as pd
+from pgm.exception import PGMException
+from pgm.gather import get_pgm_classes
+from pgm.station_summary import StationSummary
+
+
+def main(args):
+    """
+    Loop over requested pgm types and call module.getPGM() for each valid
+    request.
+
+    Args:
+        ArgumentParser: argparse argument object.
+    """
+    # Check import arguments
+    if args.input_source is not None:
+        input_source = args.input_source
+    if args.output_directory is not None:
+        output_directory = args.output_directory
+        # Create directory if it doesn't exist
+        if not os.path.exists(output_directory):
+                os.makedirs(output_directory)
+    # Get streams
+    event = EventSummary.from_files(input_source, args.components,
+            args.measurements)
+    flatfile = event.get_flatfile_dataframe()
+    event.write_flatfile(flatfile, output_directory)
+    for station in event.stations:
+        station_table = event.get_station_dataframe(station)
+        event.write_station_table(station_table, output_directory, station)
+
+def _get_parser():
+    """
+    Internal method to get argparse parser instance.
+
+    Returns:
+        ArgumentParser: argparse argument parser.
+    """
+    description = '''
+    Get requested PGM values.
+    '''
+    # Get valid classes
+    _imt_classes_ = get_pgm_classes('imt')
+    _imc_classes_ = get_pgm_classes('imc')
+    # Create descriptions
+    epilog = 'PGM Parameters:\n'
+    epilog += '\tAvailable IMTs:\n'
+    for func in _imt_classes_:
+        epilog += '\t\t- %s\n' % func[10:]
+    epilog += '\tAvailable IMCs:\n'
+    for func in _imc_classes_:
+        epilog += '\t\t- %s\n' % func[10:]
+
+    epilog += '\nFor parameters with specific percentiles or periods,\n' + \
+            'append the number on the end of the parameter string\n' + \
+            'Example spectral amplitude: sa1.0\n' + \
+            'Example geometric mean rotation: gmrotd50\n'
+    # Define parser arguments
+    parser = argparse.ArgumentParser(
+        description=description,
+        epilog=epilog,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('input_source',
+                        help='The directory of all input files.')
+    parser.add_argument('output_directory',
+                        help='The directory of all output files.')
+    parser.add_argument('-c', '--components', nargs='+', dest='components',
+            default=[], help='The IMC parameters to get.', required=True)
+    parser.add_argument('-m', '--measurements', nargs='+', dest='measurements',
+            default=[], help='The IMT parameters to get.', required=True)
+    return parser
+
+
+if __name__ == '__main__':
+    parser = _get_parser()
+    pargs = parser.parse_args()
+    if pargs.input_source.lower() == 'help':
+        parser.print_help()
+    else:
+        main(pargs)
+    sys.exit(0)

@@ -6,6 +6,6 @@ setup(name='strongmotion-database',
       author='Mike Hearne',
       author_email='mhearne@usgs.gov',
       url='https://github.com/usgs/strongmotion-database',
-      packages=[],
+      packages=['smdb'],
       scripts=['bin/getpgm'],
       )
