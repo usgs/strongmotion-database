@@ -26,36 +26,53 @@ def test_eventsummary():
 
     # test flatfile
     flatfile = event.get_flatfile_dataframe().to_dict(into=OrderedDict)
-    assert flatfile['MODY'][0] == '0206'
-    assert flatfile['MODY'][4] == '0206'
-    assert flatfile['MODY'][8] == '0206'
-    assert flatfile['MODY'][12] == '1113'
-    assert flatfile['MODY'][18] == '0124'
-    assert flatfile['Station Name'][0] == 'Anshuo'
-    assert flatfile['Station Name'][4] == 'Chulu'
-    assert flatfile['Station Name'][8] == 'Donghe'
-    assert flatfile['Station Name'][12] == 'Te_Mara_Farm_Waiau'
-    assert flatfile['Station Name'][18] == ''
-    assert flatfile['Station ID  No.'][0] == 'EAS'
-    assert flatfile['Station ID  No.'][4] == 'ECU'
-    assert flatfile['Station ID  No.'][8] == 'EDH'
-    assert flatfile['Station ID  No.'][12] == 'WTMC'
-    assert flatfile['Station ID  No.'][18] == 'AOM001'
-    assert flatfile['Station Latitude'][0] == 22.381
-    assert flatfile['Station Latitude'][4] == 22.860
-    assert flatfile['Station Latitude'][8] == 22.972
-    assert flatfile['Station Latitude'][18] == 41.5267
-    assert flatfile['Station Longitude'][0] == 120.857
-    assert flatfile['Station Longitude'][4] == 121.092
-    assert flatfile['Station Longitude'][8] == 121.305
-    assert flatfile['Station Longitude'][18] == 140.9244
+    target_modys = np.sort(np.asarray(['0206', '0206', '0206', '0206', '0206',
+            '0206', '0206', '0206', '0206', '0206', '0206', '0206', '1113',
+            '1113', '1113', '1113', '0124', '0124', '0124', '0124']))
+    mody = flatfile['MODY']
+    modys = np.sort(np.asarray([mody[key] for key in mody]))
+    np.testing.assert_array_equal(modys, target_modys)
+    target_names = np.sort(np.asarray(['Anshuo', 'Anshuo', 'Anshuo', 'Anshuo',
+            'Chulu', 'Chulu', 'Chulu', 'Chulu', 'Donghe', 'Donghe', 'Donghe',
+            'Donghe', 'Te_Mara_Farm_Waiau', 'Te_Mara_Farm_Waiau',
+            'Te_Mara_Farm_Waiau', 'Te_Mara_Farm_Waiau', '', '', '', '']))
+    name = flatfile['Station Name']
+    names = np.sort(np.asarray([name[key] for key in name]))
+    np.testing.assert_array_equal(names, target_names)
+    target_ids = np.sort(np.asarray(['EAS', 'EAS', 'EAS', 'EAS', 'ECU', 'ECU',
+            'ECU', 'ECU', 'EDH', 'EDH', 'EDH', 'EDH', 'WTMC', 'WTMC', 'WTMC',
+            'WTMC', 'AOM001', 'AOM001', 'AOM001', 'AOM001']))
+    st_id = flatfile['Station ID  No.']
+    ids = np.sort(np.asarray([st_id[key] for key in st_id]))
 
+    para_dict = event.get_parametric(event.corrected_streams[0])
+    target_top = np.sort(np.asarray(['type', 'geometry', 'properties']))
+    top_keys = [key for key in para_dict]
+    np.testing.assert_array_equal(np.sort(top_keys), target_top)
+    target_properties = np.sort(np.asarray(['channels', 'process_time',
+            'pgms']))
+    property_keys = [key for key in para_dict['properties']]
+    np.testing.assert_array_equal(np.sort(property_keys), target_properties)
+    target_geometry = np.sort(np.asarray(['type', 'coordinates']))
+    geometry_keys = [key for key in para_dict['geometry']]
+    np.testing.assert_array_equal(np.sort(geometry_keys), target_geometry)
+    target_channel = np.asarray(['stats'])
+    channel_keys = [key for key in para_dict['properties']['channels']['H1']]
+    np.testing.assert_array_equal(np.sort(channel_keys), target_channel)
     try:
         event.get_station_dataframe('INVALID')
         success = True
     except KeyError:
         success = False
     assert success == False
+    length_before = len(event.corrected_streams)
+    event.corrected_streams = []
+    length_after = len(event.corrected_streams)
+    assert length_after == length_before
+    length_before = len(event.uncorrected_streams)
+    event.uncorrected_streams = []
+    length_after = len(event.uncorrected_streams)
+    assert length_after == length_before
 
 
 if __name__ == '__main__':

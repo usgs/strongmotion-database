@@ -39,8 +39,8 @@ def test_imc_imt():
     imc = '-c channels'
     tmpdir = tempfile.mkdtemp()
     try:
-        cmd = '%s %s %s %s %s' % (getpgm, input_directory,
-                tmpdir, imc, imt)
+        cmd = '%s %s %s %s %s -t -p' % (getpgm,
+                input_directory, tmpdir, imc, imt)
         res, stdout, stderr = get_command_output(cmd)
         if not res:
             raise AssertionError('getpgm command %s failed with errors "%s"' % (cmd, stderr))
