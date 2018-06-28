@@ -7,6 +7,7 @@ dependencies:
 - defusedxml
 - descartes
 - docutils
+- impactutils
 - libcomcat
 - matplotlib
 - numpy
