@@ -40,6 +40,10 @@ def main(args):
     for station in event.stations:
         station_table = event.get_station_dataframe(station)
         event.write_station_table(station_table, output_directory, station)
+    if args.parametric is not None:
+        event.write_parametric(output_directory)
+    if args.timeseries is not None:
+        event.write_timeseries(output_directory, 'MSEED', include_json=False)
 
 def _get_parser():
     """
@@ -80,6 +84,10 @@ def _get_parser():
             default=[], help='The IMC parameters to get.', required=True)
     parser.add_argument('-m', '--measurements', nargs='+', dest='measurements',
             default=[], help='The IMT parameters to get.', required=True)
+    parser.add_argument('-t', '--timeseries', action="store_true",
+            help="Writes out the uncorrected time series for each station in miniseed.")
+    parser.add_argument('-p', '--parametric', action="store_true",
+            help="Writes out the parametric data for each station")
     return parser
 
 

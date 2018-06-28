@@ -1,7 +1,9 @@
 # stdlib imports
 from collections import OrderedDict
+import copy
 import datetime
 import glob
+import json
 import os
 import warnings
 
@@ -10,26 +12,46 @@ from amptools.io.read import read_data
 from amptools.process import filter_detrend
 from amptools.stream import group_channels
 import numpy as np
+from obspy.core.utcdatetime import UTCDateTime
+from obspy.core.util.attribdict import AttribDict
 import pandas as pd
 from pgm.station_summary import StationSummary
 
 
+TIMEFMT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
 class EventSummary(object):
     """Class for summarizing events for analysis and input into a database."""
-    def __init__(self, station_dictionary):
-        self._station_dict = station_dictionary
+    def __init__(self, station_dict):
+        self._station_dict = station_dict
+        self._uncorrected_streams = None
+        self._corrected_streams = None
 
     @property
-    def stations(self):
+    def corrected_streams(self):
         """
-        Helper method for returning a station list.
+        Helper method for returning a list of corrected streams.
 
         Returns:
-            list: List of station codes (str)
+            list: List of corrected streams (obspy.core.stream.Stream)
         """
-        print("Getting list of stations.")
-        stations = [station for station in self._station_dict]
-        return stations
+        streams = copy.deepcopy(self._corrected_streams)
+        return streams
+
+    @corrected_streams.setter
+    def corrected_streams(self, streams):
+        """
+        Helper method for setting a list of corrected streams.
+
+        Args:
+            listreamsst: List of corrected streams (obspy.core.stream.Stream)
+        """
+        if len(streams) == len(self.station_dict):
+            self._corrected_streams = streams
+        else:
+            warnings.warn('Stream list is not the same length as the number '
+                    'of stations. Setting failed.', Warning)
 
     @classmethod
     def from_files(cls, directory, imcs, imts):
@@ -45,46 +67,59 @@ class EventSummary(object):
             EventSummary: EventSummary object.
         """
         streams = []
-        # gather streams
+        # gather streams so that they can be grouped
         for file_path in glob.glob(directory + '/*'):
             streams += [read_data(file_path)]
-        # group station traces
         streams = group_channels(streams)
-        # process streams
+        uncorrected_streams = copy.deepcopy(streams)
         #TODO separate into another method and add config for processing parameters
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             for idx, trace in enumerate(streams):
                 streams[idx] = filter_detrend(streams[idx])
-        # create dictionary of StationSummary objects
+        # create dictionary of StationSummary objects for use by other methods
         station_dict = OrderedDict()
         for stream in streams:
             station = stream[0].stats['station']
             station_dict[station] = StationSummary(stream, imcs, imts)
         event = cls(station_dict)
+        event.uncorrected_streams = uncorrected_streams
+        event.corrected_streams = streams
         return event
 
-    def get_station_dataframe(self, station_key):
-        if station_key not in self._station_dict:
-            raise KeyError('Not an available station %r.' % station_key)
-        station = self._station_dict[station_key]
-        pgms = station.pgms.copy()
-        # Initialize dataframe headers
-        dataframe_dict = OrderedDict()
-        dataframe_dict[''] = []
-        imt_keys = np.sort([val for val in pgms])
-        imc_keys = np.sort([val for val in pgms[imt_keys[0]]])
-        for imc_key in imc_keys:
-            dataframe_dict[imc_key] = []
-        for imt_key in imt_keys:
-            dataframe_dict[''] += [imt_key]
-        # Create dataframe
-        for imc_key in imc_keys:
-            for imt_key in imt_keys:
-                dataframe_dict[imc_key] += [pgms[imt_key][imc_key]]
-        # Create pandas dataframe
-        dataframe = pd.DataFrame(data=dataframe_dict)
-        return dataframe
+    def get_channels_metadata(self, stream):
+        """
+        Helper method that organizes metadata for channels for get_parametric.
+
+        Args:
+            stream (obspy.core.stream.Stream): Stream of one stations data.
+
+        Returns:
+            dictionary: Channel metadata data for get_parametric.
+        """
+        channels = {}
+        for trace in stream:
+            channel = trace.stats['channel']
+            # for no orientiation defined channels call channel1, channel2, or channel3
+            channels_list = ['channel1', 'channel2', 'channel3']
+            if channel == 'HHN' or channel == 'H1' or channel == 'N' or channel == 'S':
+                channel_code = 'H1'
+            elif channel == 'HHE' or channel == 'H2' or channel == 'E' or channel == 'W':
+                channel_code = 'H2'
+            elif channel == 'HHZ' or channel == 'Z' or channel == 'Up' or channel == 'Down':
+                channel_code = 'Z'
+            else:
+                channel_code = channels_list.pop()
+            channel_metadata = {}
+            if 'processing_parameters' in trace.stats:
+                channel_metadata['processing_parameters'] = copy.deepcopy(trace.stats['processing'])
+            stats = {}
+            for key in trace.stats:
+                if key != 'processing_parameters':
+                    stats[key] = copy.deepcopy(trace.stats[key])
+            channel_metadata['stats'] = stats
+            channels[channel_code] = channel_metadata
+        return channels
 
     def get_flatfile_dataframe(self):
         """
@@ -94,7 +129,7 @@ class EventSummary(object):
         Returns:
             pandas.DataFrame: Flatfile-like table.
         """
-        stations_obj = self._station_dict.copy()
+        stations_obj = copy.deepcopy(self.station_dict)
         flat_list = []
         for station_key in self.stations:
             station = stations_obj[station_key]
@@ -126,7 +161,7 @@ class EventSummary(object):
                 - All requested PGM values (one type per column)
                 ...
         """
-        pgms = station.pgms.copy()
+        pgms = copy.deepcopy(station.pgms)
         dataframe_dict = OrderedDict()
         # Initialize dataframe headers
         columns = ['YEAR', 'MODY', 'HRMN',
@@ -165,6 +200,112 @@ class EventSummary(object):
         dataframe = pd.DataFrame(data=dataframe_dict)
         return dataframe
 
+    def get_parametric(self, stream):
+        """
+        Creates a dictionary of parametric data for one station/stream.
+
+        Args:
+            stream (obspy.core.stream.Stream): Stream of one stations data.
+
+        Returns:
+            dictionary: Parametric data for one station/stream.
+        """
+        #TODO add Fault and distances properties
+        lon = stream[0].stats.coordinates.longitude
+        lat = stream[0].stats.coordinates.latitude
+        channels = self.get_channels_metadata(stream)
+        station = stream[0].stats.station
+        pgms = copy.deepcopy(self.station_dict[station].pgms)
+        # Set properties
+        properties = {}
+        properties['channels'] = channels
+        properties['pgms'] = pgms
+        properties['process_time'] = datetime.datetime.utcnow().strftime(TIMEFMT)
+        properties = self._clean_stats(properties)
+        # create geojson structure
+        json = {"type": "Feature",
+                "geometry": {"type": "Point",
+                             "coordinates": [lon, lat]},
+                     "properties": properties
+                }
+        return json
+
+    def get_station_dataframe(self, station_key):
+        """
+        Create a dataframe representing imts and imcs as a tableself.
+
+        Args:
+            station_key (str): Station id.
+
+        Returns:
+            pandas.DataFrame: Table of imcs and imts.
+        """
+        if station_key not in self.station_dict:
+            raise KeyError('Not an available station %r.' % station_key)
+        station = self.station_dict[station_key]
+        pgms = copy.deepcopy(station.pgms)
+        dataframe_dict = OrderedDict()
+        dataframe_dict[''] = []
+        imt_keys = np.sort([val for val in pgms])
+        imc_keys = np.sort([val for val in pgms[imt_keys[0]]])
+        for imc_key in imc_keys:
+            dataframe_dict[imc_key] = []
+        for imt_key in imt_keys:
+            dataframe_dict[''] += [imt_key]
+        # Create dataframe
+        for imc_key in imc_keys:
+            for imt_key in imt_keys:
+                dataframe_dict[imc_key] += [pgms[imt_key][imc_key]]
+        # Create pandas dataframe
+        dataframe = pd.DataFrame(data=dataframe_dict)
+        return dataframe
+
+    @property
+    def stations(self):
+        """
+        Helper method for returning a station list.
+
+        Returns:
+            list: List of station codes (str)
+        """
+        stations = [station for station in self.station_dict]
+        return stations
+
+    @property
+    def station_dict(self):
+        """
+        Helper method for returning a station dictionary.
+
+        Returns:
+            dictionary: StationSummary objects for each station.
+        """
+        return self._station_dict
+
+    @property
+    def uncorrected_streams(self):
+        """
+        Helper method for returning a list of uncorrected streams.
+
+        Returns:
+            list: List of uncorrected streams (obspy.core.stream.Stream)
+        """
+        streams = copy.deepcopy(self._uncorrected_streams)
+        return streams
+
+    @uncorrected_streams.setter
+    def uncorrected_streams(self, streams):
+        """
+        Helper method for setting a list of uncorrected streams.
+
+        Args:
+            streams (list): Uncorrected streams (obspy.core.stream.Stream)
+        """
+        if len(streams) == len(self.station_dict):
+            self._uncorrected_streams = streams
+        else:
+            warnings.warn('Stream list is not the same length as the number '
+                    'of stations. Setting failed.', Warning)
+
     def write_flatfile(self, dataframe, output_directory):
         """
         Writes the flatfile dataframe as a csv file.
@@ -180,6 +321,38 @@ class EventSummary(object):
         # Export csv
         dataframe.to_csv(path, mode = 'w', index=False)
 
+    def write_parametric(self, directory):
+        """
+        Writes timeseries data to a specified format.
+
+        Args:
+            directory (str): Path to output directory.
+
+        Notes:
+            Obspy are listed in the documentation for the write method:
+            https://docs.obspy.org/packages/autogen/obspy.core.stream.Stream.write.html.
+            Outputs will include the time series in the specified format and
+            a json file containing parametric data.
+        """
+        # Create directory if it doesn't exist
+        if not os.path.exists(directory):
+                os.makedirs(directory)
+        # Output parametric should be a record of the corrected streams
+        # unless no corrected streams exist
+        if self.corrected_streams is not None:
+            streams = self.corrected_streams
+        else:
+            streams = self.uncorrected_streams
+        for stream in streams:
+            station = stream[0].stats['station']
+            starttime = stream[0].stats['starttime'].strftime("%Y%m%d%H%M%S")
+            extension = '.json'
+            file = station + starttime + extension
+            file_path = os.path.join(directory, file)
+            geojson = self.get_parametric(stream)
+            with open(file_path,'wt') as f:
+                json.dump(geojson, f)
+
     def write_station_table(self, dataframe, output_directory, station):
         """
         Writes the station table as a csv file.
@@ -194,3 +367,53 @@ class EventSummary(object):
         path = os.path.join(output_directory, filename)
         # Export csv
         dataframe.to_csv(path, mode = 'w', index=False)
+
+    def write_timeseries(self, directory, file_format, include_json=True):
+        """
+        Writes timeseries data to a specified format.
+
+        Args:
+            directory (str): Path to output directory.
+            file_format (str): One of the accepted obspy time series formats.
+            include_json (bool): Write geojson file at the same time. Defaults
+                    to True.
+        Notes:
+            Obspy are listed in the documentation for the write method:
+            https://docs.obspy.org/packages/autogen/obspy.core.stream.Stream.write.html.
+            Outputs will include the time series in the specified format and
+            a json file containing parametric data.
+        """
+        file_format = file_format.upper()
+        # Create directory if it doesn't exist
+        if not os.path.exists(directory):
+                os.makedirs(directory)
+        # Output streams should be a record of the uncorrected streams
+        for stream in self.uncorrected_streams:
+            station = stream[0].stats['station']
+            starttime = stream[0].stats['starttime'].strftime("%Y%m%d%H%M%S")
+            extension = '.' + file_format
+            file = station + starttime + extension
+            file_path = os.path.join(directory, file)
+            stream.write(file_path, file_format)
+        # parametric data will be required to use from_products in the future
+        if include_json is not None:
+            self.write_parametric(directory)
+
+    def _clean_stats(self, stats):
+        """
+        Helper function for making dictionary json serializable.
+
+        Args:
+            stats (dict): Dictionary of stats.
+
+        Returns:
+            dictionary: Dictionary of cleaned stats.
+        """
+        for key, value in stats.items():
+            if isinstance(value, (dict, AttribDict)):
+                stats[key] = dict(self._clean_stats(value))
+            elif isinstance(value, UTCDateTime):
+                stats[key] = value.strftime(TIMEFMT)
+            elif isinstance(value, float) and np.isnan(value) or value == '':
+                stats[key] = 'null'
+        return stats

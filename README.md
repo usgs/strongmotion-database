@@ -62,7 +62,51 @@ Supported formats include:
 )
 - [USC](https://strongmotioncenter.org/vdc/USC_Vol1Format.txt)
 
-#### Use
+### Use
 getpgm [-h] -c COMPONENTS [COMPONENTS ...] -m MEASUREMENTS
-              [MEASUREMENTS ...]
-              input_source output_directory format
+              [MEASUREMENTS ...] [-t] [-p]
+              input_source output_directory
+
+Get requested PGM values.
+
+
+#### Positional arguments
+
+  input_source:          The directory of all input files.
+
+  output_directory:      The directory of all output files.
+
+#### Optional arguments
+
+  -h, --help:            show this help message and exit
+
+  -c COMPONENTS [COMPONENTS ...], --components COMPONENTS [COMPONENTS ...]:
+                        The IMC parameters to get.
+
+
+  -m MEASUREMENTS [MEASUREMENTS ...], --measurements MEASUREMENTS [MEASUREMENTS ...]:
+                        The IMT parameters to get.
+
+
+  -t, --timeseries:      Writes out the uncorrected time series for each
+                        station in miniseed.
+
+
+  -p, --parametric:      Writes out the parametric data for each station.
+
+#### PGM Parameters
+Available IMTs:
+- pga
+- sa
+- pgv
+
+Available IMCs:
+- greater_of_two_horizontals
+- channels
+- gmrotd
+
+#### For parameters with specific percentiles or periods, append the number on the end of the parameter string.
+
+Example spectral amplitude: sa1.0
+
+Example geometric mean rotation: gmrotd50
