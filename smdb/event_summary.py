@@ -12,6 +12,7 @@ from amptools.io.read import read_data
 from amptools.process import filter_detrend
 from amptools.stream import group_channels
 import numpy as np
+from obspy import read
 from obspy.core.utcdatetime import UTCDateTime
 from obspy.core.util.attribdict import AttribDict
 import pandas as pd
@@ -81,10 +82,56 @@ class EventSummary(object):
         station_dict = OrderedDict()
         for stream in streams:
             station = stream[0].stats['station']
-            station_dict[station] = StationSummary(stream, imcs, imts)
+            station_dict[station] = StationSummary.from_stream(stream,
+                    imcs, imts)
         event = cls(station_dict)
         event.uncorrected_streams = uncorrected_streams
         event.corrected_streams = streams
+        return event
+
+    @classmethod
+    def from_products(cls, directory, process=True):
+        """
+        Read obspy and geojson from a directory and return an EventSummary object.
+
+        Args:
+            directory (str): Path to input files
+            process (bool): Process the streams as documented in the
+                processing_parameters property of each parametric file.
+                Not used at this time.
+
+        Returns:
+            EventSummary: EventSummary object.
+        """
+        # gather streams so that they can be grouped
+        station_dict = OrderedDict()
+        uncorrected_streams = []
+        for file_path in glob.glob(directory + '/*'):
+            if file_path.find('.json') < 0:
+                stream = read(file_path)
+                file_name = os.path.basename(file_path).split('.')[0]
+                json_path = os.path.join(directory, file_name + '.json')
+                if not os.path.isfile(json_path):
+                    raise IOError('No parametric data available for '
+                            'this stream: %r. Skipping...' % file_path)
+                else:
+                    with open(json_path) as f:
+                        parametric = json.load(f)
+                    for trace in stream:
+                        trace_channel = trace.stats['channel']
+                        for channel in parametric['properties']['channels']:
+                            chdict = parametric['properties']['channels'][channel]
+                            channel_stats = chdict['stats']
+                            if trace_channel == channel:
+                                trace.stats = channel_stats
+                    station = stream[0].stats['station']
+                    pgms = parametric['properties']['pgms']
+                    station_dict[station] = StationSummary.from_pgms(
+                            station, pgms)
+                    uncorrected_streams += [stream]
+        ## TODO: add processing
+        event = cls(station_dict)
+        event.uncorrected_streams = uncorrected_streams
         return event
 
     def get_channels_metadata(self, stream):
@@ -279,7 +326,7 @@ class EventSummary(object):
         Returns:
             dictionary: StationSummary objects for each station.
         """
-        return self._station_dict
+        return copy.deepcopy(self._station_dict)
 
     @property
     def uncorrected_streams(self):
@@ -316,9 +363,15 @@ class EventSummary(object):
         """
         # Create file path
         today = datetime.datetime.now().strftime("%Y_%m_%d")
-        filename = today + '_flatfile.csv'
+        filename = today + '_flatfile%s.csv'
         path = os.path.join(output_directory, filename)
-        # Export csv
+        file_number = ""
+        while os.path.isfile(path % file_number):
+            last = path % file_number
+            file_number = int(file_number or 0) + 1
+        path = path % file_number
+        if file_number != "":
+            print('%r already exists, writing to %r.' % (last, path))
         dataframe.to_csv(path, mode = 'w', index=False)
 
     def write_parametric(self, directory):
@@ -363,9 +416,16 @@ class EventSummary(object):
             station (str): Station code.
         """
         # Create file path
-        filename = station + '.csv'
+        filename = station + '%s.csv'
         path = os.path.join(output_directory, filename)
         # Export csv
+        file_number = ''
+        while os.path.isfile(path % file_number):
+            last = path % file_number
+            file_number = int(file_number or 0) + 1
+        path = path % file_number
+        if file_number != "":
+            print('%r already exists, writing to %r.' % (last, path))
         dataframe.to_csv(path, mode = 'w', index=False)
 
     def write_timeseries(self, directory, file_format, include_json=True):
@@ -395,8 +455,8 @@ class EventSummary(object):
             file = station + starttime + extension
             file_path = os.path.join(directory, file)
             stream.write(file_path, file_format)
-        # parametric data will be required to use from_products in the future
-        if include_json is not None:
+        # parametric data will be required to use from_products
+        if include_json is True:
             self.write_parametric(directory)
 
     def _clean_stats(self, stats):
