@@ -3,6 +3,9 @@
 # stdlib imports
 from collections import OrderedDict
 import os
+import shutil
+import tempfile
+import warnings
 
 # third party imports
 import numpy as np
@@ -59,20 +62,45 @@ def test_eventsummary():
     target_channel = np.asarray(['stats'])
     channel_keys = [key for key in para_dict['properties']['channels']['H1']]
     np.testing.assert_array_equal(np.sort(channel_keys), target_channel)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            event.get_station_dataframe('INVALID')
+            success = True
+        except KeyError:
+            success = False
+        assert success == False
+        length_before = len(event.corrected_streams)
+        event.corrected_streams = []
+        length_after = len(event.corrected_streams)
+        assert length_after == length_before
+        length_before = len(event.uncorrected_streams)
+        event.uncorrected_streams = []
+        length_after = len(event.uncorrected_streams)
+        assert length_after == length_before
+    tmpdir = tempfile.mkdtemp()
+    flatfile = event.get_flatfile_dataframe()
+    station = event.station_dict.popitem(last=False)[0]
+    print(station)
+    df = event.get_station_dataframe(station)
+    event.write_station_table(df, tmpdir, station)
+    event.write_station_table(df, tmpdir, station)
+    event.write_flatfile(flatfile, tmpdir)
+    event.write_flatfile(flatfile, tmpdir)
+    shutil.rmtree(tmpdir)
+    tmpdir = tempfile.mkdtemp()
+    event.write_timeseries(tmpdir, 'MSEED')
+    prods = EventSummary.from_products(tmpdir)
+    shutil.rmtree(tmpdir)
+    tmpdir = tempfile.mkdtemp()
     try:
-        event.get_station_dataframe('INVALID')
+        event.write_timeseries(tmpdir, 'MSEED', False)
+        prods = EventSummary.from_products(tmpdir)
         success = True
-    except KeyError:
+    except IOError:
         success = False
     assert success == False
-    length_before = len(event.corrected_streams)
-    event.corrected_streams = []
-    length_after = len(event.corrected_streams)
-    assert length_after == length_before
-    length_before = len(event.uncorrected_streams)
-    event.uncorrected_streams = []
-    length_after = len(event.uncorrected_streams)
-    assert length_after == length_before
+    shutil.rmtree(tmpdir)
 
 
 if __name__ == '__main__':
