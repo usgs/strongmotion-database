@@ -50,6 +50,12 @@ def test_config():
             }
     }
     _validate_config(config)
+    del config['pdl']
+    del config['scp']
+    del config['comcat']
+    # Should pass without these parameters
+    _validate_config(config)
+
     del config['processing_parameters']
     # Test missing parameters
     try:

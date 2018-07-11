@@ -2,6 +2,10 @@ TIMEFMT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 CONFIG_FILE = '.smdb/config.yml'
 
+PRODUCT_TYPE = 'smdb_params'
+
+JSON_FILE = 'smdb_params.json'
+
 DEFAULT_CONFIG = {
         'processing_parameters': {
                 'amplitude': {

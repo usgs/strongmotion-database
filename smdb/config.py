@@ -44,8 +44,13 @@ def _validate_config(config):
         raise TypeError("Config is empty or is populated incorrectly.")
     config_keys = _get_keys(copy.deepcopy(config), [])
     default_keys = _get_keys(copy.deepcopy(DEFAULT_CONFIG), [])
-    difference = [key for key in default_keys if
-            (key not in config_keys and key != 'pdl' and key != 'scp')]
+    # Only look for differences in processing_parameters and pgm lists
+    # The user should be able to use EventSummary for processing and analysis
+    # without providing database info
+    excluded_keys = ['comcat', 'host', 'scp', 'remote_host', 'keyfile', 'pdl',
+            'java', 'jarfile', 'privatekey', 'configfile', 'product_source']
+    difference = [key for key in default_keys if (key not in config_keys and
+            key not in excluded_keys)]
     if len(difference) > 0:
         raise KeyError('Missing required parameters %r.' % difference)
 
