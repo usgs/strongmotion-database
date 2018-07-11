@@ -57,7 +57,7 @@ class EventSummary(object):
                     'number of stations. Setting failed.', Warning)
 
     @classmethod
-    def from_files(cls, directory, imcs=None, imts=None):
+    def fromFiles(cls, directory, imcs=None, imts=None):
         """
         Read files from a directory and return an EventSummary object.
 
@@ -84,11 +84,11 @@ class EventSummary(object):
         event.uncorrected_streams = uncorrected_streams
         event.process()
         # create dictionary of StationSummary objects for use by other methods
-        event.set_station_dictionary(imcs, imts)
+        event.setStationDictionary(imcs, imts)
         return event
 
     @classmethod
-    def from_products(cls, directory, process=True):
+    def fromProducts(cls, directory, process=True):
         """
         Read obspy and geojson from a directory and return an EventSummary object.
 
@@ -110,7 +110,7 @@ class EventSummary(object):
                 file_name = os.path.basename(file_path).split('.')[0]
                 json_path = os.path.join(directory, file_name + '.json')
                 if not os.path.isfile(json_path):
-                    raise IOError('No parametric data available for '
+                    raise FileNotFoundError('No parametric data available for '
                             'this stream: %r.' % file_path)
                 with open(json_path) as f:
                     parametric = json.load(f)
@@ -132,15 +132,15 @@ class EventSummary(object):
         event.uncorrected_streams = uncorrected_streams
         return event
 
-    def get_channels_metadata(self, stream):
+    def getChannelsMetadata(self, stream):
         """
-        Helper method that organizes metadata for channels for get_parametric.
+        Helper method that organizes metadata for channels for getParametric.
 
         Args:
             stream (obspy.core.stream.Stream): Stream of one stations data.
 
         Returns:
-            dictionary: Channel metadata data for get_parametric.
+            dictionary: Channel metadata data for getParametric.
         """
         channels = {}
         for trace in stream:
@@ -166,7 +166,7 @@ class EventSummary(object):
             channels[channel_code] = channel_metadata
         return channels
 
-    def get_flatfile_dataframe(self):
+    def getFlatfileDataframe(self):
         """
         Creates a dataframe for all stations similar to a flatfile where each
         row is a channel/component.
@@ -179,17 +179,17 @@ class EventSummary(object):
         """
         if self.station_dict is None:
             raise Exception('The station dictionary has not been set. Use '
-                'set_station_dictionary.')
+                'setStationDictionary.')
         stations_obj = copy.deepcopy(self.station_dict)
         flat_list = []
         for station_key in self.stations:
             station = stations_obj[station_key]
-            flat_rows = self.get_flatfile_row(station)
+            flat_rows = self.getFlatfileRow(station)
             flat_list += [flat_rows]
         all_rows = pd.concat(flat_list).reset_index(drop=True)
         return all_rows
 
-    def get_flatfile_row(self, station):
+    def getFlatfileRow(self, station):
         """
         Creates a single dataframe row similar to a flatfile where each row
         is a channel/component for one station.
@@ -251,7 +251,7 @@ class EventSummary(object):
         dataframe = pd.DataFrame(data=dataframe_dict)
         return dataframe
 
-    def get_parametric(self, stream):
+    def getParametric(self, stream):
         """
         Creates a dictionary of parametric data for one station/stream.
 
@@ -264,7 +264,7 @@ class EventSummary(object):
         #TODO add Fault and distances properties
         lon = stream[0].stats.coordinates.longitude
         lat = stream[0].stats.coordinates.latitude
-        channels = self.get_channels_metadata(stream)
+        channels = self.getChannelsMetadata(stream)
         station = stream[0].stats.station
         pgms = copy.deepcopy(self.station_dict[station].pgms)
         # Set properties
@@ -272,7 +272,7 @@ class EventSummary(object):
         properties['channels'] = channels
         properties['pgms'] = pgms
         properties['process_time'] = datetime.datetime.utcnow().strftime(TIMEFMT)
-        properties = self._clean_stats(properties)
+        properties = self._cleanStats(properties)
         # create geojson structure
         json = {"type": "Feature",
                 "geometry": {"type": "Point",
@@ -281,7 +281,7 @@ class EventSummary(object):
                 }
         return json
 
-    def get_station_dataframe(self, station_key):
+    def getStationDataframe(self, station_key):
         """
         Create a dataframe representing imts and imcs as a tableself.
 
@@ -297,7 +297,7 @@ class EventSummary(object):
         """
         if self.station_dict is None:
             raise Exception('The station dictionary has not been set. Use '
-                'set_station_dictionary.')
+                'setStationDictionary.')
         elif station_key not in self.station_dict:
             raise KeyError('Not an available station %r.' % station_key)
         station = self.station_dict[station_key]
@@ -318,7 +318,7 @@ class EventSummary(object):
         dataframe = pd.DataFrame(data=dataframe_dict)
         return dataframe
 
-    def set_station_dictionary(self, imcs=None, imts=None):
+    def setStationDictionary(self, imcs=None, imts=None):
         """
         Calculate the station summaries and set the dictionary.
 
@@ -465,7 +465,7 @@ class EventSummary(object):
             warnings.warn('Stream dictionary is not the same length as the '
                     'number of stations. Setting failed.', Warning)
 
-    def write_flatfile(self, dataframe, output_directory):
+    def writeFlatfile(self, dataframe, output_directory):
         """
         Writes the flatfile dataframe as a csv file.
 
@@ -480,10 +480,10 @@ class EventSummary(object):
         today = datetime.datetime.now().strftime("%Y_%m_%d")
         filename = today + '_flatfile%s.csv'
         path = os.path.join(output_directory, filename)
-        path = self._correct_path(path)
+        path = self._correctPath(path)
         dataframe.to_csv(path, mode = 'w', index=False)
 
-    def write_parametric(self, directory):
+    def writeParametric(self, directory):
         """
         Writes timeseries data to a specified format.
 
@@ -511,11 +511,11 @@ class EventSummary(object):
             extension = '.json'
             file = station + starttime + extension
             file_path = os.path.join(directory, file)
-            geojson = self.get_parametric(stream)
+            geojson = self.getParametric(stream)
             with open(file_path,'wt') as f:
                 json.dump(geojson, f)
 
-    def write_station_table(self, dataframe, output_directory, station):
+    def writeStationTable(self, dataframe, output_directory, station):
         """
         Writes the station table as a csv file.
 
@@ -530,10 +530,10 @@ class EventSummary(object):
         # Create file path
         filename = station + '%s.csv'
         path = os.path.join(output_directory, filename)
-        path = self._correct_path(path)
+        path = self._correctPath(path)
         dataframe.to_csv(path, mode = 'w', index=False)
 
-    def write_timeseries(self, directory, file_format, include_json=True):
+    def writeTimeseries(self, directory, file_format, include_json=True):
         """
         Writes timeseries data to a specified format.
 
@@ -562,9 +562,9 @@ class EventSummary(object):
             stream.write(file_path, file_format)
         # parametric data will be required to use from_products
         if include_json is True:
-            self.write_parametric(directory)
+            self.writeParametric(directory)
 
-    def _clean_stats(self, stats):
+    def _cleanStats(self, stats):
         """
         Helper function for making dictionary json serializable.
 
@@ -576,14 +576,14 @@ class EventSummary(object):
         """
         for key, value in stats.items():
             if isinstance(value, (dict, AttribDict)):
-                stats[key] = dict(self._clean_stats(value))
+                stats[key] = dict(self._cleanStats(value))
             elif isinstance(value, UTCDateTime):
                 stats[key] = value.strftime(TIMEFMT)
             elif isinstance(value, float) and np.isnan(value) or value == '':
                 stats[key] = 'null'
         return stats
 
-    def _correct_path(self, path):
+    def _correctPath(self, path):
         """
         Helper to detect if a file already exists and append a number if it does.
 

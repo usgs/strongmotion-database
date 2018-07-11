@@ -19,12 +19,12 @@ def test_eventsummary():
     homedir = os.path.dirname(os.path.abspath(__file__))
     input_directory = os.path.join(homedir, '..', 'data')
     # test EventSummary object
-    event = EventSummary.from_files(input_directory,
+    event = EventSummary.fromFiles(input_directory,
             ['channels', 'greater_of_two_horizontals'],
             ['PGA', 'PGV', 'SA(0.3)', 'SA(1.0)', 'SA(3.0)'])
 
     # test EventSummary object from config
-    event_config = EventSummary.from_files(input_directory)
+    event_config = EventSummary.fromFiles(input_directory)
 
     assert event_config.station_dict['EAS'].pgms == event.station_dict['EAS'].pgms
 
@@ -34,7 +34,7 @@ def test_eventsummary():
     np.testing.assert_array_equal(np.sort(stations), np.sort(target_stations))
 
     # test flatfile
-    flatfile = event.get_flatfile_dataframe().to_dict(into=OrderedDict)
+    flatfile = event.getFlatfileDataframe().to_dict(into=OrderedDict)
     target_modys = np.sort(np.asarray(['0206', '0206', '0206', '0206', '0206',
             '0206', '0206', '0206', '0206', '0206', '0206', '0206', '1113',
             '1113', '1113', '1113', '0124', '0124', '0124', '0124']))
@@ -54,7 +54,7 @@ def test_eventsummary():
     st_id = flatfile['Station ID  No.']
     ids = np.sort(np.asarray([st_id[key] for key in st_id]))
 
-    para_dict = event.get_parametric(event.corrected_streams['AOM001'])
+    para_dict = event.getParametric(event.corrected_streams['AOM001'])
     target_top = np.sort(np.asarray(['type', 'geometry', 'properties']))
     top_keys = [key for key in para_dict]
     np.testing.assert_array_equal(np.sort(top_keys), target_top)
@@ -71,7 +71,7 @@ def test_eventsummary():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-            event.get_station_dataframe('INVALID')
+            event.getStationDataframe('INVALID')
             success = True
         except KeyError:
             success = False
@@ -90,27 +90,27 @@ def test_eventsummary():
     event.process(station='WTMC')
 
     tmpdir = tempfile.mkdtemp()
-    flatfile = event.get_flatfile_dataframe()
+    flatfile = event.getFlatfileDataframe()
     station = event.station_dict.popitem(last=False)[0]
-    df = event.get_station_dataframe(station)
-    event.write_station_table(df, tmpdir, station)
-    event.write_station_table(df, tmpdir, station)
-    event.write_flatfile(flatfile, tmpdir)
-    event.write_flatfile(flatfile, tmpdir)
+    df = event.getStationDataframe(station)
+    event.writeStationTable(df, tmpdir, station)
+    event.writeStationTable(df, tmpdir, station)
+    event.writeFlatfile(flatfile, tmpdir)
+    event.writeFlatfile(flatfile, tmpdir)
     shutil.rmtree(tmpdir)
 
     tmpdir = tempfile.mkdtemp()
-    event.write_timeseries(tmpdir, 'MSEED')
-    prods = EventSummary.from_products(tmpdir)
+    event.writeTimeseries(tmpdir, 'MSEED')
+    prods = EventSummary.fromProducts(tmpdir)
     shutil.rmtree(tmpdir)
 
-    # IOError with missing parametric data
+    # FileNotFoundError with missing parametric data
     tmpdir = tempfile.mkdtemp()
     try:
-        event.write_timeseries(tmpdir, 'MSEED', False)
-        prods = EventSummary.from_products(tmpdir)
+        event.writeTimeseries(tmpdir, 'MSEED', False)
+        prods = EventSummary.fromProducts(tmpdir)
         success = True
-    except IOError:
+    except FileNotFoundError:
         success = False
     assert success == False
     shutil.rmtree(tmpdir)
@@ -126,7 +126,7 @@ def test_eventsummary():
 
     # Exception with missing processed_streams
     try:
-        empty_event.set_station_dictionary()
+        empty_event.setStationDictionary()
         success = True
     except Exception:
         success = False
@@ -142,7 +142,7 @@ def test_eventsummary():
 
     # Exception with missing station_dict
     try:
-        empty_event.get_station_dataframe()
+        empty_event.getStationDataframe()
         success = True
     except Exception:
         success = False
@@ -150,7 +150,7 @@ def test_eventsummary():
 
     # Exception with missing station_dict
     try:
-        empty_event.get_flatfile_dataframe()
+        empty_event.getFlatfileDataframe()
         success = True
     except Exception:
         success = False
