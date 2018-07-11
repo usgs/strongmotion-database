@@ -30,6 +30,8 @@ def get_config():
 
 def test_put_params():
     config = get_config()
+    if config is None:
+        return True
     if 'pdl' not in config:
         print('This system is not configured with a PDL client. Stopping.')
         return True
@@ -38,6 +40,8 @@ def test_put_params():
 
 def test_get_params():
     config = get_config()
+    if config is None:
+        return True
     if 'comcat' not in config:
         fmt = 'No configuration to retrieve data from comcat. Stopping.'
         print(fmt)
