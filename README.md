@@ -47,7 +47,8 @@ If you do not have anaconda or miniconda, but have Python 3.X installed with pip
 ## getpgm
 
 This tool presumes there is a directory containing files of strong ground
-motion data as time series, in a format supported by amptools.
+motion data as time series, in a format supported by amptools. At this time
+time series must be acceleration.
 
 Supported formats include:
 - [COSMOS](https://strongmotioncenter.org/vdc/cosmos_format_1_20.pdf

@@ -30,17 +30,17 @@ def main(args):
     if args.output_directory is not None:
         output_directory = args.output_directory
     # Get streams
-    event = EventSummary.from_files(input_source, args.components,
+    event = EventSummary.fromFiles(input_source, args.components,
             args.measurements)
-    flatfile = event.get_flatfile_dataframe()
-    event.write_flatfile(flatfile, output_directory)
+    flatfile = event.getFlatfileDataframe()
+    event.writeFlatfile(flatfile, output_directory)
     for station in event.stations:
-        station_table = event.get_station_dataframe(station)
-        event.write_station_table(station_table, output_directory, station)
+        station_table = event.getStationDataframe(station)
+        event.writeStationTable(station_table, output_directory, station)
     if args.parametric is not None:
-        event.write_parametric(output_directory)
+        event.writeParametric(output_directory)
     if args.timeseries is not None:
-        event.write_timeseries(output_directory, 'MSEED', include_json=False)
+        event.writeTimeseries(output_directory, 'MSEED', include_json=False)
 
 def _get_parser():
     """
