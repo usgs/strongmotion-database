@@ -8,8 +8,8 @@ import os.path
 from impactutils.transfer.pdlsender import PDLSender
 from libcomcat.search import get_event_by_id
 
-PRODUCT_TYPE = 'smdb_params'
-JSON_FILE = 'smdb_params.json'
+# local imports
+from smdb.constants import JSON_FILE, PRODUCT_TYPE
 
 
 def store_params(param_data, config, eventsource, eventsourcecode):

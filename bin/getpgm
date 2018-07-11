@@ -29,9 +29,6 @@ def main(args):
         input_source = args.input_source
     if args.output_directory is not None:
         output_directory = args.output_directory
-        # Create directory if it doesn't exist
-        if not os.path.exists(output_directory):
-                os.makedirs(output_directory)
     # Get streams
     event = EventSummary.from_files(input_source, args.components,
             args.measurements)

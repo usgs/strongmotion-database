@@ -18,24 +18,26 @@ from obspy.core.util.attribdict import AttribDict
 import pandas as pd
 from pgm.station_summary import StationSummary
 
-
-TIMEFMT = "%Y-%m-%dT%H:%M:%S.%fZ"
+# local imports
+from smdb.config import get_config
+from smdb.constants import TIMEFMT
 
 
 class EventSummary(object):
     """Class for summarizing events for analysis and input into a database."""
-    def __init__(self, station_dict):
-        self._station_dict = station_dict
+    def __init__(self):
+        self._station_dict = None
         self._uncorrected_streams = None
         self._corrected_streams = None
 
     @property
     def corrected_streams(self):
         """
-        Helper method for returning a list of corrected streams.
+        Helper method for returning a dictionary of corrected streams.
 
         Returns:
-            list: List of corrected streams (obspy.core.stream.Stream)
+            dictionary: Corrected streams (obspy.core.stream.Stream)
+
         """
         streams = copy.deepcopy(self._corrected_streams)
         return streams
@@ -43,26 +45,28 @@ class EventSummary(object):
     @corrected_streams.setter
     def corrected_streams(self, streams):
         """
-        Helper method for setting a list of corrected streams.
+        Helper method for setting a dictionary of corrected streams.
 
         Args:
-            listreamsst: List of corrected streams (obspy.core.stream.Stream)
+            streams (dictionary): Corrected streams (obspy.core.stream.Stream)
         """
-        if len(streams) == len(self.station_dict):
+        if self.station_dict is None or len(streams) == len(self.station_dict):
             self._corrected_streams = streams
         else:
-            warnings.warn('Stream list is not the same length as the number '
-                    'of stations. Setting failed.', Warning)
+            warnings.warn('Stream dictionary is not the same length as the '
+                    'number of stations. Setting failed.', Warning)
 
     @classmethod
-    def from_files(cls, directory, imcs, imts):
+    def from_files(cls, directory, imcs=None, imts=None):
         """
         Read files from a directory and return an EventSummary object.
 
         Args:
             directory (str): Path to input files.
-            imcs (list): List of intensity measurement components (str).
-            imts (list): List of intensity measurement types (str).
+            imcs (list): List of intensity measurement components (str). Default
+                    is None.
+            imts (list): List of intensity measurement types (str). Default
+                    is None.
 
         Returns:
             EventSummary: EventSummary object.
@@ -72,21 +76,15 @@ class EventSummary(object):
         for file_path in glob.glob(directory + '/*'):
             streams += [read_data(file_path)]
         streams = group_channels(streams)
-        uncorrected_streams = copy.deepcopy(streams)
-        #TODO separate into another method and add config for processing parameters
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            for idx, trace in enumerate(streams):
-                streams[idx] = filter_detrend(streams[idx])
-        # create dictionary of StationSummary objects for use by other methods
-        station_dict = OrderedDict()
+        uncorrected_streams = {}
         for stream in streams:
             station = stream[0].stats['station']
-            station_dict[station] = StationSummary.from_stream(stream,
-                    imcs, imts)
-        event = cls(station_dict)
+            uncorrected_streams[station] = stream
+        event = cls()
         event.uncorrected_streams = uncorrected_streams
-        event.corrected_streams = streams
+        event.process()
+        # create dictionary of StationSummary objects for use by other methods
+        event.set_station_dictionary(imcs, imts)
         return event
 
     @classmethod
@@ -105,7 +103,7 @@ class EventSummary(object):
         """
         # gather streams so that they can be grouped
         station_dict = OrderedDict()
-        uncorrected_streams = []
+        uncorrected_streams = {}
         for file_path in glob.glob(directory + '/*'):
             if file_path.find('.json') < 0:
                 stream = read(file_path)
@@ -113,24 +111,24 @@ class EventSummary(object):
                 json_path = os.path.join(directory, file_name + '.json')
                 if not os.path.isfile(json_path):
                     raise IOError('No parametric data available for '
-                            'this stream: %r. Skipping...' % file_path)
-                else:
-                    with open(json_path) as f:
-                        parametric = json.load(f)
-                    for trace in stream:
-                        trace_channel = trace.stats['channel']
-                        for channel in parametric['properties']['channels']:
-                            chdict = parametric['properties']['channels'][channel]
-                            channel_stats = chdict['stats']
-                            if trace_channel == channel:
-                                trace.stats = channel_stats
-                    station = stream[0].stats['station']
-                    pgms = parametric['properties']['pgms']
-                    station_dict[station] = StationSummary.from_pgms(
-                            station, pgms)
-                    uncorrected_streams += [stream]
-        ## TODO: add processing
-        event = cls(station_dict)
+                            'this stream: %r.' % file_path)
+                with open(json_path) as f:
+                    parametric = json.load(f)
+                for trace in stream:
+                    trace_channel = trace.stats['channel']
+                    for channel in parametric['properties']['channels']:
+                        chdict = parametric['properties']['channels'][channel]
+                        channel_stats = chdict['stats']
+                        if trace_channel == channel:
+                            trace.stats = channel_stats
+                station = stream[0].stats['station']
+                pgms = parametric['properties']['pgms']
+                station_dict[station] = StationSummary.from_pgms(
+                        station, pgms)
+                uncorrected_streams[station] = stream
+        ## TODO: add processing option after next amptools release
+        event = cls()
+        event._station_dict = station_dict
         event.uncorrected_streams = uncorrected_streams
         return event
 
@@ -175,7 +173,13 @@ class EventSummary(object):
 
         Returns:
             pandas.DataFrame: Flatfile-like table.
+
+        Raises:
+            Exception if no station dictionary has been set.
         """
+        if self.station_dict is None:
+            raise Exception('The station dictionary has not been set. Use '
+                'set_station_dictionary.')
         stations_obj = copy.deepcopy(self.station_dict)
         flat_list = []
         for station_key in self.stations:
@@ -286,8 +290,15 @@ class EventSummary(object):
 
         Returns:
             pandas.DataFrame: Table of imcs and imts.
+
+        Raises:
+            Exception: If no station_dictionary is set.
+            KeyError: If the station is not in the station dictionaryself.
         """
-        if station_key not in self.station_dict:
+        if self.station_dict is None:
+            raise Exception('The station dictionary has not been set. Use '
+                'set_station_dictionary.')
+        elif station_key not in self.station_dict:
             raise KeyError('Not an available station %r.' % station_key)
         station = self.station_dict[station_key]
         pgms = copy.deepcopy(station.pgms)
@@ -306,6 +317,39 @@ class EventSummary(object):
         # Create pandas dataframe
         dataframe = pd.DataFrame(data=dataframe_dict)
         return dataframe
+
+    def set_station_dictionary(self, imcs=None, imts=None):
+        """
+        Calculate the station summaries and set the dictionary.
+
+        Args:
+            imcs (list): List of intensity measurement components (str). Default
+                    is None. If none imclist from config is used.
+            imts (list): List of intensity measurement types (str). Default
+                    is None. If None imtlist from config is used.
+
+        Notes:
+            Requires that corrected_streams is set.
+
+        Raises:
+            Exception: If corrected_streams is not set.
+        """
+        # use defaults if imcs or imts are not specified
+        config = get_config()
+        if imcs is None:
+            imcs = config['imclist']
+        if imts is None:
+            imts = config['imtlist']
+
+        if self.corrected_streams is None:
+            raise Exception('Processed streams are required to create a '
+                    'StationSummary object and create the dictionary.')
+        station_dict = OrderedDict()
+        for station in self.corrected_streams:
+            stream = self.corrected_streams[station]
+            station_dict[station] = StationSummary.from_stream(stream,
+                    imcs, imts)
+        self._station_dict = station_dict
 
     @property
     def stations(self):
@@ -328,13 +372,81 @@ class EventSummary(object):
         """
         return copy.deepcopy(self._station_dict)
 
+    def process(self, config=None, station=None):
+        """Process all stations in the EventSummary.
+
+        Args:
+            config (dictionary): Config dictionary containing processing
+                    parameters. Default is None. None results in using
+                    get_config to find the user defined config or the default.
+            station (str): Station to process. Default is None. None results in
+                    all stations being processed.
+
+        Raises:
+            Exception: If there are not unprocessed streams.
+        """
+        if self.uncorrected_streams is None:
+            raise Exception('There are no unprocessed streams to process.')
+
+        # get config if none is supplied
+        if config is None:
+            config = get_config()
+
+        ## TODO: Update to use amptools new process method after next release
+        params = config['processing_parameters']
+        taper_percentage = params['taper']['max_percentage']
+        taper_type = params['taper']['type']
+
+        if station is None:
+            corrected_streams = {}
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                for station_code in self.uncorrected_streams:
+                    stream = self.uncorrected_streams[station_code]
+                    for idx, trace in enumerate(stream):
+                        trace.detrend('linear')
+                        trace.detrend('demean')
+                        trace.taper(max_percentage=taper_percentage,
+                                type=taper_type)
+                        trace.filter('highpass', freq=0.02, zerophase=True,
+                                corners=4)
+                        trace.detrend('linear')
+                        trace.detrend('demean')
+                    stream[idx] = trace
+                    corrected_streams[station_code] = stream
+            self.corrected_streams = corrected_streams
+        else:
+            if self.corrected_streams is None:
+                warnings.warn('%r cannot be reprocessed, since the '
+                'processed_streams dictionary has not been populated. Process '
+                'all stream, then this station can be reprocessed.' % station)
+                return
+            if station not in self.uncorrected_streams:
+                warnings.warn('%r is not an available station. Processing will '
+                        'not continue.' % station)
+                return
+            stream = self.uncorrected_streams[station]
+            corrected_streams = self.corrected_streams
+            for idx, trace in enumerate(stream):
+                trace.detrend('linear')
+                trace.detrend('demean')
+                trace.taper(max_percentage=taper_percentage,
+                        type=taper_type)
+                trace.filter('highpass', freq=0.02, zerophase=True,
+                        corners=4)
+                trace.detrend('linear')
+                trace.detrend('demean')
+            stream[idx] = trace
+            corrected_streams[station] = stream
+            self.corrected_streams = corrected_streams
+
     @property
     def uncorrected_streams(self):
         """
-        Helper method for returning a list of uncorrected streams.
+        Helper method for returning a dictionary of uncorrected streams.
 
         Returns:
-            list: List of uncorrected streams (obspy.core.stream.Stream)
+            dictionary: Uncorrected streams (obspy.core.stream.Stream)
         """
         streams = copy.deepcopy(self._uncorrected_streams)
         return streams
@@ -342,16 +454,16 @@ class EventSummary(object):
     @uncorrected_streams.setter
     def uncorrected_streams(self, streams):
         """
-        Helper method for setting a list of uncorrected streams.
+        Helper method for setting a dictionary of uncorrected streams.
 
         Args:
-            streams (list): Uncorrected streams (obspy.core.stream.Stream)
+            streams (dictionary): Uncorrected streams (obspy.core.stream.Stream)
         """
-        if len(streams) == len(self.station_dict):
+        if self.station_dict is None or len(streams) == len(self.station_dict):
             self._uncorrected_streams = streams
         else:
-            warnings.warn('Stream list is not the same length as the number '
-                    'of stations. Setting failed.', Warning)
+            warnings.warn('Stream dictionary is not the same length as the '
+                    'number of stations. Setting failed.', Warning)
 
     def write_flatfile(self, dataframe, output_directory):
         """
@@ -361,17 +473,14 @@ class EventSummary(object):
             dataframe (pandas.DataFrame): Dataframe of flatfile.
             output_directory (str): Path to output directory.
         """
+        # Create directory if it doesn't exist
+        if not os.path.exists(output_directory):
+                os.makedirs(output_directory)
         # Create file path
         today = datetime.datetime.now().strftime("%Y_%m_%d")
         filename = today + '_flatfile%s.csv'
         path = os.path.join(output_directory, filename)
-        file_number = ""
-        while os.path.isfile(path % file_number):
-            last = path % file_number
-            file_number = int(file_number or 0) + 1
-        path = path % file_number
-        if file_number != "":
-            print('%r already exists, writing to %r.' % (last, path))
+        path = self._correct_path(path)
         dataframe.to_csv(path, mode = 'w', index=False)
 
     def write_parametric(self, directory):
@@ -396,8 +505,8 @@ class EventSummary(object):
             streams = self.corrected_streams
         else:
             streams = self.uncorrected_streams
-        for stream in streams:
-            station = stream[0].stats['station']
+        for station in streams:
+            stream = streams[station]
             starttime = stream[0].stats['starttime'].strftime("%Y%m%d%H%M%S")
             extension = '.json'
             file = station + starttime + extension
@@ -415,17 +524,13 @@ class EventSummary(object):
             output_directory (str): Path to output directory.
             station (str): Station code.
         """
+        # Create directory if it doesn't exist
+        if not os.path.exists(output_directory):
+                os.makedirs(output_directory)
         # Create file path
         filename = station + '%s.csv'
         path = os.path.join(output_directory, filename)
-        # Export csv
-        file_number = ''
-        while os.path.isfile(path % file_number):
-            last = path % file_number
-            file_number = int(file_number or 0) + 1
-        path = path % file_number
-        if file_number != "":
-            print('%r already exists, writing to %r.' % (last, path))
+        path = self._correct_path(path)
         dataframe.to_csv(path, mode = 'w', index=False)
 
     def write_timeseries(self, directory, file_format, include_json=True):
@@ -448,8 +553,8 @@ class EventSummary(object):
         if not os.path.exists(directory):
                 os.makedirs(directory)
         # Output streams should be a record of the uncorrected streams
-        for stream in self.uncorrected_streams:
-            station = stream[0].stats['station']
+        for station in self.uncorrected_streams:
+            stream = self.uncorrected_streams[station]
             starttime = stream[0].stats['starttime'].strftime("%Y%m%d%H%M%S")
             extension = '.' + file_format
             file = station + starttime + extension
@@ -477,3 +582,23 @@ class EventSummary(object):
             elif isinstance(value, float) and np.isnan(value) or value == '':
                 stats[key] = 'null'
         return stats
+
+    def _correct_path(self, path):
+        """
+        Helper to detect if a file already exists and append a number if it does.
+
+        Args:
+            path (str): Path to the csv file.
+
+        Notes:
+            This is only used by plot and table writers.
+        """
+        # Export csv
+        file_number = ''
+        while os.path.isfile(path % file_number):
+            last = path % file_number
+            file_number = int(file_number or 0) + 1
+        path = path % file_number
+        if file_number != "":
+            print('%r already exists, writing to %r.' % (last, path))
+        return path

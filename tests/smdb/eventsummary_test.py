@@ -21,7 +21,13 @@ def test_eventsummary():
     # test EventSummary object
     event = EventSummary.from_files(input_directory,
             ['channels', 'greater_of_two_horizontals'],
-            ['pga', 'pgv', 'sa0.3', 'sa1.0', 'sa3.0'])
+            ['PGA', 'PGV', 'SA(0.3)', 'SA(1.0)', 'SA(3.0)'])
+
+    # test EventSummary object from config
+    event_config = EventSummary.from_files(input_directory)
+
+    assert event_config.station_dict['EAS'].pgms == event.station_dict['EAS'].pgms
+
     assert type(event) == EventSummary
     target_stations = np.asarray(['EAS', 'ECU', 'EDH', 'WTMC', 'AOM001'])
     stations = np.asarray(event.stations)
@@ -48,7 +54,7 @@ def test_eventsummary():
     st_id = flatfile['Station ID  No.']
     ids = np.sort(np.asarray([st_id[key] for key in st_id]))
 
-    para_dict = event.get_parametric(event.corrected_streams[0])
+    para_dict = event.get_parametric(event.corrected_streams['AOM001'])
     target_top = np.sort(np.asarray(['type', 'geometry', 'properties']))
     top_keys = [key for key in para_dict]
     np.testing.assert_array_equal(np.sort(top_keys), target_top)
@@ -78,20 +84,27 @@ def test_eventsummary():
         event.uncorrected_streams = []
         length_after = len(event.uncorrected_streams)
         assert length_after == length_before
+        event.process(station='INVALID')
+
+    # Test reprocessing station
+    event.process(station='WTMC')
+
     tmpdir = tempfile.mkdtemp()
     flatfile = event.get_flatfile_dataframe()
     station = event.station_dict.popitem(last=False)[0]
-    print(station)
     df = event.get_station_dataframe(station)
     event.write_station_table(df, tmpdir, station)
     event.write_station_table(df, tmpdir, station)
     event.write_flatfile(flatfile, tmpdir)
     event.write_flatfile(flatfile, tmpdir)
     shutil.rmtree(tmpdir)
+
     tmpdir = tempfile.mkdtemp()
     event.write_timeseries(tmpdir, 'MSEED')
     prods = EventSummary.from_products(tmpdir)
     shutil.rmtree(tmpdir)
+
+    # IOError with missing parametric data
     tmpdir = tempfile.mkdtemp()
     try:
         event.write_timeseries(tmpdir, 'MSEED', False)
@@ -101,6 +114,47 @@ def test_eventsummary():
         success = False
     assert success == False
     shutil.rmtree(tmpdir)
+
+    # Exception with missing uncorrected_streams
+    empty_event = EventSummary()
+    try:
+        empty_event.process()
+        success = True
+    except Exception:
+        success = False
+    assert success == False
+
+    # Exception with missing processed_streams
+    try:
+        empty_event.set_station_dictionary()
+        success = True
+    except Exception:
+        success = False
+    assert success == False
+
+    # Exception with missing processed_streams
+    try:
+        empty_event.process(station='INVALID')
+        success = True
+    except Exception:
+        success = False
+    assert success == False
+
+    # Exception with missing station_dict
+    try:
+        empty_event.get_station_dataframe()
+        success = True
+    except Exception:
+        success = False
+    assert success == False
+
+    # Exception with missing station_dict
+    try:
+        empty_event.get_flatfile_dataframe()
+        success = True
+    except Exception:
+        success = False
+    assert success == False
 
 
 if __name__ == '__main__':

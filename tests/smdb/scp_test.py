@@ -5,6 +5,8 @@ import os.path
 from datetime import datetime
 
 # local imports
+from smdb.config import get_config
+from smdb.constants import DEFAULT_CONFIG
 from smdb.scp import (create_remote_folder,
                       check_remote_folder,
                       get_ssh_connection,
@@ -13,23 +15,10 @@ from smdb.scp import (create_remote_folder,
 # third party imports
 import yaml
 
-# config file
-CONFIG_FILE = '.smdb/config.yml'
-
-
-def get_config():
-    cfg_file = os.path.join(os.path.expanduser('~'), CONFIG_FILE)
-    if not os.path.isfile(cfg_file):
-        return None
-
-    config = yaml.load(open(cfg_file))
-
-    return config
-
 
 def get_remote_cfg():
     config = get_config()
-    if config is None:
+    if config is None or config == DEFAULT_CONFIG:
         return (None, None)
     if 'scp' not in config:
         return (None, None)
