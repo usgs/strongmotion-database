@@ -29,6 +29,8 @@ def get_config():
 
 def get_remote_cfg():
     config = get_config()
+    if config is None:
+        return (None, None)
     if 'scp' not in config:
         return (None, None)
 
