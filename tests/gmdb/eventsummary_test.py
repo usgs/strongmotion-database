@@ -11,7 +11,7 @@ import warnings
 import numpy as np
 
 # local imports
-from smdb.event_summary import EventSummary
+from gmdb.event_summary import EventSummary
 
 
 # stdlb import

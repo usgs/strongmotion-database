@@ -5,9 +5,9 @@ import os.path
 from datetime import datetime
 
 # local imports
-from smdb.config import get_config
-from smdb.constants import DEFAULT_CONFIG
-from smdb.pdl import store_params, get_params
+from gmdb.config import get_config
+from gmdb.constants import DEFAULT_CONFIG
+from gmdb.pdl import store_params, get_params
 
 # third party imports
 import yaml

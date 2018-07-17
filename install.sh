@@ -21,7 +21,7 @@ source $prof
 echo "Path:"
 echo $PATH
 
-VENV=smdb
+VENV=gmdb
 
 # Is the reset flag set?
 reset=0
@@ -116,7 +116,7 @@ echo "Activating the $VENV virtual environment"
 conda activate $VENV
 
 # This package
-echo "Installing strongmotion-database..."
+echo "Installing groundmotion-database..."
 pip install -e .
 
 # Install default profile

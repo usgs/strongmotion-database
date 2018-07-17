@@ -8,7 +8,7 @@ import os.path
 import yaml
 
 # local imports
-from smdb.constants import CONFIG_FILE, DEFAULT_CONFIG
+from gmdb.constants import CONFIG_FILE, DEFAULT_CONFIG
 
 
 def get_config():

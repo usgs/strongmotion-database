@@ -19,8 +19,8 @@ import pandas as pd
 from pgm.station_summary import StationSummary
 
 # local imports
-from smdb.config import get_config
-from smdb.constants import TIMEFMT
+from gmdb.config import get_config
+from gmdb.constants import TIMEFMT
 
 
 class EventSummary(object):

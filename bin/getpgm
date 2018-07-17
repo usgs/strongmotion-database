@@ -7,7 +7,7 @@ import os.path
 import sys
 
 # local imports
-from smdb.event_summary import EventSummary
+from gmdb.event_summary import EventSummary
 
 # third party imports
 import pandas as pd

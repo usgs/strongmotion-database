@@ -9,7 +9,7 @@ from impactutils.transfer.pdlsender import PDLSender
 from libcomcat.search import get_event_by_id
 
 # local imports
-from smdb.constants import JSON_FILE, PRODUCT_TYPE
+from gmdb.constants import JSON_FILE, PRODUCT_TYPE
 
 
 def store_params(param_data, config, eventsource, eventsourcecode):
