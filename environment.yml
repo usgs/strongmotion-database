@@ -1,4 +1,4 @@
-name: smdb
+name: gmdb
 channels:
 - conda-forge
 - defaults

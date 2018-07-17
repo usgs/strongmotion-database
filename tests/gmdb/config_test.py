@@ -1,4 +1,4 @@
-from smdb.config import _validate_config
+from gmdb.config import _validate_config
 
 def test_config():
     config = {

@@ -1,10 +1,10 @@
 TIMEFMT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
-CONFIG_FILE = '.smdb/config.yml'
+CONFIG_FILE = '.gmdb/config.yml'
 
-PRODUCT_TYPE = 'smdb_params'
+PRODUCT_TYPE = 'gmdb_params'
 
-JSON_FILE = 'smdb_params.json'
+JSON_FILE = 'gmdb_params.json'
 
 DEFAULT_CONFIG = {
         'processing_parameters': {

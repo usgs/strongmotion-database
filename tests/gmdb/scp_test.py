@@ -5,9 +5,9 @@ import os.path
 from datetime import datetime
 
 # local imports
-from smdb.config import get_config
-from smdb.constants import DEFAULT_CONFIG
-from smdb.scp import (create_remote_folder,
+from gmdb.config import get_config
+from gmdb.constants import DEFAULT_CONFIG
+from gmdb.scp import (create_remote_folder,
                       check_remote_folder,
                       get_ssh_connection,
                       delete_remote_folder)
