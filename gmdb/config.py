@@ -23,8 +23,6 @@ def get_config():
     config_file = os.path.join(os.path.expanduser('~'), CONFIG_FILE)
     if not os.path.isfile(config_file):
         config = DEFAULT_CONFIG
-        fmt = 'Missing config file %s, setting config to default config.'
-        print(fmt % config_file)
     else:
         config = yaml.safe_load(open(config_file, 'rt'))
         _validate_config(config)
