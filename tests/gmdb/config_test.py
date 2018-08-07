@@ -18,6 +18,8 @@ def test_config():
                     'corners': {
                             'get_dynamically': True,
                             'sn_ratio': 3.0,
+                            'max_low_freq': 0.1,
+                            'min_high_freq': 5.0,
                             'default_low_frequency': 0.1,
                             'default_high_frequency': 20.0
                     },

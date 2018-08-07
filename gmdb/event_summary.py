@@ -9,7 +9,7 @@ import warnings
 
 # third party imports
 from amptools.io.read import read_data
-from amptools.process import filter_detrend
+from amptools.process import process_config
 from amptools.stream import group_channels
 import numpy as np
 from obspy import read
@@ -57,7 +57,7 @@ class EventSummary(object):
                     'number of stations. Setting failed.', Warning)
 
     @classmethod
-    def fromFiles(cls, directory, imcs=None, imts=None):
+    def fromFiles(cls, directory, imcs=None, imts=None, process=True):
         """
         Read files from a directory and return an EventSummary object.
 
@@ -67,6 +67,7 @@ class EventSummary(object):
                     is None.
             imts (list): List of intensity measurement types (str). Default
                     is None.
+            process (bool): Whether or not to process the streams.
 
         Returns:
             EventSummary: EventSummary object.
@@ -82,9 +83,10 @@ class EventSummary(object):
             uncorrected_streams[station] = stream
         event = cls()
         event.uncorrected_streams = uncorrected_streams
-        event.process()
-        # create dictionary of StationSummary objects for use by other methods
-        event.setStationDictionary(imcs, imts)
+        if process:
+            event.process()
+            # create dictionary of StationSummary objects for use by other methods
+            event.setStationDictionary(imcs, imts)
         return event
 
     @classmethod
@@ -144,20 +146,11 @@ class EventSummary(object):
         """
         channels = {}
         for trace in stream:
-            channel = trace.stats['channel']
-            # for no orientiation defined channels call channel1, channel2, or channel3
-            channels_list = ['channel1', 'channel2', 'channel3']
-            if channel == 'HHN' or channel == 'H1' or channel == 'N' or channel == 'S':
-                channel_code = 'H1'
-            elif channel == 'HHE' or channel == 'H2' or channel == 'E' or channel == 'W':
-                channel_code = 'H2'
-            elif channel == 'HHZ' or channel == 'Z' or channel == 'Up' or channel == 'Down':
-                channel_code = 'Z'
-            else:
-                channel_code = channels_list.pop()
+            channel_code = trace.stats['channel']
             channel_metadata = {}
             if 'processing_parameters' in trace.stats:
-                channel_metadata['processing_parameters'] = copy.deepcopy(trace.stats['processing'])
+                processing = copy.deepcopy(trace.stats['processing_parameters'])
+                channel_metadata['processing_parameters'] = processing
             stats = {}
             for key in trace.stats:
                 if key != 'processing_parameters':
@@ -264,7 +257,7 @@ class EventSummary(object):
         #TODO add Fault and distances properties
         lon = stream[0].stats.coordinates.longitude
         lat = stream[0].stats.coordinates.latitude
-        channels = self.getChannelsMetadata(stream)
+        channels = self._cleanStats(self.getChannelsMetadata(stream))
         station = stream[0].stats.station
         pgms = copy.deepcopy(self.station_dict[station].pgms)
         # Set properties
@@ -359,7 +352,7 @@ class EventSummary(object):
         Returns:
             list: List of station codes (str)
         """
-        stations = [station for station in self.station_dict]
+        stations = [station for station in self.uncorrected_streams]
         return stations
 
     @property
@@ -372,7 +365,7 @@ class EventSummary(object):
         """
         return copy.deepcopy(self._station_dict)
 
-    def process(self, config=None, station=None):
+    def process(self, config=None, station=None, event_time=None, epi_dist=None):
         """Process all stations in the EventSummary.
 
         Args:
@@ -392,28 +385,13 @@ class EventSummary(object):
         if config is None:
             config = get_config()
 
-        ## TODO: Update to use amptools new process method after next release
-        params = config['processing_parameters']
-        taper_percentage = params['taper']['max_percentage']
-        taper_type = params['taper']['type']
-
         if station is None:
             corrected_streams = {}
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                for station_code in self.uncorrected_streams:
-                    stream = self.uncorrected_streams[station_code]
-                    for idx, trace in enumerate(stream):
-                        trace.detrend('linear')
-                        trace.detrend('demean')
-                        trace.taper(max_percentage=taper_percentage,
-                                type=taper_type)
-                        trace.filter('highpass', freq=0.02, zerophase=True,
-                                corners=4)
-                        trace.detrend('linear')
-                        trace.detrend('demean')
-                    stream[idx] = trace
-                    corrected_streams[station_code] = stream
+            for station_code in self.uncorrected_streams:
+                stream = self.uncorrected_streams[station_code]
+                processed_stream = process_config(stream,
+                        config=config, event_time=event_time, epi_dist=epi_dist)
+                corrected_streams[station_code] = processed_stream
             self.corrected_streams = corrected_streams
         else:
             if self.corrected_streams is None:
@@ -427,17 +405,9 @@ class EventSummary(object):
                 return
             stream = self.uncorrected_streams[station]
             corrected_streams = self.corrected_streams
-            for idx, trace in enumerate(stream):
-                trace.detrend('linear')
-                trace.detrend('demean')
-                trace.taper(max_percentage=taper_percentage,
-                        type=taper_type)
-                trace.filter('highpass', freq=0.02, zerophase=True,
-                        corners=4)
-                trace.detrend('linear')
-                trace.detrend('demean')
-            stream[idx] = trace
-            corrected_streams[station] = stream
+            processed_stream = process_config(stream,
+                    config=config, event_time=event_time, epi_dist=epi_dist)
+            corrected_streams[station] = processed_stream
             self.corrected_streams = corrected_streams
 
     @property
