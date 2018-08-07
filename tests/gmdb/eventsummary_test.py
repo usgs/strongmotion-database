@@ -65,8 +65,8 @@ def test_eventsummary():
     target_geometry = np.sort(np.asarray(['type', 'coordinates']))
     geometry_keys = [key for key in para_dict['geometry']]
     np.testing.assert_array_equal(np.sort(geometry_keys), target_geometry)
-    target_channel = np.asarray(['stats'])
-    channel_keys = [key for key in para_dict['properties']['channels']['H1']]
+    target_channel = np.sort(np.asarray(['stats', 'processing_parameters']))
+    channel_keys = [key for key in para_dict['properties']['channels']['HN1']]
     np.testing.assert_array_equal(np.sort(channel_keys), target_channel)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

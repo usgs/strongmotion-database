@@ -23,23 +23,39 @@ and outputs simple flatfiles and tables of IMC and IMT values.
 
 # Installing
 
-If you already have a miniconda or anaconda Python 3.X environment:
+#### If you already have a miniconda or anaconda Python 3.5 environment:
 
+Automated install:
+- `git clone https://github.com/usgs/groundmotion-database.git`
+- `cd groundmotion-database`
+- `bash intall.sh`
+- `conda activate gmdb`
+
+Manual install:
  - `conda install numpy`
  - `conda install pandas`
  - `conda install openpyxl`
  - `conda install lxml`
+ - `conda install amptools`
  - `pip install git+https://github.com/usgs/groundmotion-database.git`
 
-If you do not have anaconda or miniconda, but have Python 3.X installed with pip:
+
+#### If you do not have anaconda or miniconda, but have Python 3.5 installed with pip:
  - `pip install numpy`
  - `pip install pandas`
  - `pip install openpyxl`
  - `pip install lxml`
+ - `pip install git+https://github.com/usgs/shakemap-amp-tools.git`
  - `pip install git+https://github.com/usgs/groundmotion-database.git`
 
 ## Updating
 
+Updating automated install:
+- `cd groundmotion-database`
+- `git pull --ff-only https://github.com/usgs/groundmotion-database.git master`
+- `bash install.sh`
+
+Updating manually installed:
  - `pip install --upgrade git+https://github.com/usgs/groundmotion-database.git`
 
 # Tools
@@ -95,19 +111,37 @@ Get requested PGM values.
 
   -p, --parametric:      Writes out the parametric data for each station.
 
+  usage: getpgm [-h] -c COMPONENTS [COMPONENTS ...] -m MEASUREMENTS
+              [MEASUREMENTS ...] [-t] [-p]
+              input_source output_directory
+
+    Get requested PGM values.
+
 #### PGM Parameters
 Available IMTs:
 - pga
 - sa
 - pgv
+- arias (arias intensity)
 
 Available IMCs:
 - greater_of_two_horizontals
 - channels
 - gmrotd
+- rotd
 
 #### For parameters with specific percentiles or periods, append the number on the end of the parameter string.
 
 Example spectral amplitude: sa1.0
 
 Example geometric mean rotation: gmrotd50
+
+
+The [resulting files](https://github.com/usgs/groundmotion-database/tree/master/tests/output_examples) will contain each requested IMT for each component requested.
+Units of returned IMTs are as follows:
+- PGA: %g
+- PGV: cm/s
+- arias: m/s
+- sa: %g
+
+#### For further information refer to additional [notebooks](https://github.com/usgs/groundmotion-database/tree/master/notebooks)
